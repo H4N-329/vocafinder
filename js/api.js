@@ -32,6 +32,11 @@ export const findArtists=(term,signal)=>{
   u.searchParams.set('lang','Japanese');
   return cachedFetch(u,signal);
 };
+export const fetchArtist=(id,signal)=>{
+  const u=new URL(ROOT+'/artists/'+encodeURIComponent(id));
+  u.searchParams.set('fields','WebLinks');u.searchParams.set('lang','Japanese');
+  return cachedFetch(u,signal);
+};
 export const fetchSong=(id,signal)=>{
   const u=new URL(ROOT+'/songs/'+encodeURIComponent(id));
   u.searchParams.set('fields',FIELDS);u.searchParams.set('lang','Japanese');

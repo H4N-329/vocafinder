@@ -26,9 +26,9 @@ export const saveEdits=edits=>{
   try{localStorage.setItem(KEY,JSON.stringify(edits));return true;}catch{return false;}
 };
 export const validateImport=obj=>{
-  if(!obj||!['vocafinder-edits-v2','vocafinder-backup-v4'].includes(obj.format)||typeof obj.edits!=='object'||!obj.edits||Array.isArray(obj.edits))throw new Error('VocaFinder v2用のバックアップではありません。');
+  if(!obj||!['vocafinder-edits-v2','vocafinder-backup-v4','vocafinder-backup-v5'].includes(obj.format)||typeof obj.edits!=='object'||!obj.edits||Array.isArray(obj.edits))throw new Error('VocaFinder v2用のバックアップではありません。');
   const entries=Object.entries(obj.edits);
   if(entries.length>MAX)throw new Error('登録曲数の上限を超えています。');
   return Object.fromEntries(entries.filter(([id])=>/^(?:\d{1,10}|local:[a-z0-9-]{5,60})$/.test(id)).map(([id,v])=>[id,cleanEdit(v)]));
 };
-export const backupJson = (edits,addedSongs=[]) => JSON.stringify({format:'vocafinder-backup-v4',exportedAt:new Date().toISOString(),edits,addedSongs},null,2);
+export const backupJson = (edits,addedSongs=[],channels={},uploaders={}) => JSON.stringify({format:'vocafinder-backup-v5',exportedAt:new Date().toISOString(),edits,addedSongs,channels,uploaders},null,2);
