@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1120">
+  <meta name="description" content="VocaDBからボカロ曲名・アーティスト・BPM・動画リンクを検索。CSV出力、BPM手動登録、情報補完にも対応。">
+  <title>VocaFinder v2 | ボカロ楽曲検索</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header"><div class="wrap topbar"><a class="brand" href="./" aria-label="VocaFinderトップ"><span class="brand-icon">♫</span> Voca<span>Finder</span><small>v2.0</small></a><div class="header-right"><span class="caption" aria-hidden="true">VOCALOID MUSIC DISCOVERY</span><button type="button" class="ghost-btn" id="openSettings">設定・バックアップ</button></div></div></header>
+  <div class="hero"><div class="wrap"><div class="eyebrow"><span class="live-dot"></span> VocaDB PUBLIC API</div><h1>ボカロ曲を、<br><em>もっと自由に探そう。</em></h1><p class="lead">曲名・アーティスト・ジャケット・投稿日・動画・BPMをひとつに。DJ向けの絞り込みやCSV保存にも対応。</p>
+    <form id="searchForm" class="search-panel">
+      <div class="search-tabs" role="radiogroup" aria-label="検索対象"><label><input type="radio" name="searchMode" value="song" checked><span>曲名で探す</span></label><label><input type="radio" name="searchMode" value="artist"><span>アーティストで探す</span></label></div>
+      <div class="search-line"><label class="sr-only" for="query">検索ワード</label><input type="search" id="query" maxlength="100" required placeholder="例：ゴーストルール"><button type="submit" class="primary" id="searchBtn">検索する <span aria-hidden="true">↗</span></button></div>
+    </form>
+    <div class="examples">試してみる <button data-sample="ゴーストルール" type="button">ゴーストルール</button><button data-sample="千本桜" type="button">千本桜</button><button data-sample="DECO*27" data-mode="artist" type="button">DECO*27</button><button data-sample="Mitchie M" data-mode="artist" type="button">Mitchie M</button></div>
+  </div></div>
+  <main class="wrap content">
+    <div id="artistSection" class="artist-section" hidden><div class="section-head"><h2>アーティスト候補</h2><p>対象のアーティストを選択すると楽曲一覧を取得します。</p></div><div class="artist-grid" id="artistResults"></div></div>
+    <div class="results-top"><div><div class="eyebrow small">SONG LIBRARY</div><h2 id="resultsHeading">楽曲を検索してください</h2><p class="subtle" id="resultsSummary">VocaDBの公開データから検索できます。</p></div><button id="exportCsv" class="outlined" disabled type="button">↓ 表示中をCSV出力</button></div>
+    <section class="filter-panel" aria-label="検索結果の絞り込み"><div class="field bpm-field"><label for="minBpm">BPM 下限</label><input type="number" id="minBpm" placeholder="例: 120" min="20" max="400" step="1"></div><div class="field bpm-field"><label for="maxBpm">BPM 上限</label><input type="number" id="maxBpm" placeholder="例: 150" min="20" max="400" step="1"></div><div class="field sort-field"><label for="sort">並び替え</label><select id="sort"><option value="original">検索順</option><option value="bpmAsc">BPM：低い順</option><option value="bpmDesc">BPM：高い順</option><option value="dateDesc">公開日：新しい順</option><option value="dateAsc">公開日：古い順</option><option value="name">曲名：五十音・ABC順</option></select></div><label class="check-field"><input type="checkbox" id="onlyKnown"> BPM登録済みのみ</label><button class="text-btn" type="button" id="resetFilters">条件をクリア</button></section>
+    <p class="scope-note" id="scopeNote">※ 絞り込み・並び替えは「取得済みの曲」が対象です。件数が多い場合は下部の「もっと読み込む」を押してください。</p>
+    <div class="alert" role="status" id="status" aria-live="polite">検索したい曲名・アーティスト名を入力してください。</div>
+    <div class="song-grid" id="results" aria-live="polite"></div>
+    <div class="load-area"><button type="button" id="loadMore" class="outlined" hidden>もっと読み込む <span aria-hidden="true">↓</span></button></div>
+  </main>
+  <dialog id="detailDialog" class="dialog"><div class="dialog-header"><span>楽曲詳細・情報補完</span><button class="close-btn" type="button" data-close="detailDialog" aria-label="閉じる">×</button></div><div id="detailBody" class="dialog-body"></div></dialog>
+  <dialog id="settingsDialog" class="dialog"><div class="dialog-header"><span>設定・バックアップ</span><button type="button" class="close-btn" data-close="settingsDialog" aria-label="閉じる">×</button></div><div class="dialog-body"><h2>不足動画を検索する</h2><p class="subtle">ニコニコは公開検索APIを試します。失敗した場合も外部検索リンクから確認できます。</p><div class="field"><label for="youtubeKey">YouTube Data API キー（任意）</label><input type="password" id="youtubeKey" autocomplete="off" placeholder="未入力の場合はYouTube検索ページを使用"></div><p class="subtle">入力したキーはページを閉じると破棄され、GitHubには保存しません。Google Cloudでキーを発行し、HTTPリファラー制限とAPI制限を設定してください。キーなしでも手動登録できます。</p><hr><h2>BPM・動画URL・配信日をバックアップ</h2><p class="subtle">手動登録はこの端末・ブラウザ内だけに保存されます。別の端末へ移すにはJSONのエクスポート／インポートを使います。</p><div class="button-row"><button id="exportBackup" type="button" class="outlined">設定をJSON出力</button><label class="outlined file-button">JSONを取り込む<input type="file" id="importBackup" accept=".json,application/json" hidden></label></div><p id="settingsMessage" role="status" class="subtle"></p><hr><h2>データ利用について</h2><p class="subtle">VocaDB等の外部サービスとは検索時のみ通信します。サイト独自のサーバーやユーザー登録はありません。CSVには現在の表示結果のみが含まれます。</p></div></dialog>
+  <footer class="footer"><div class="wrap footer-inner"><div><strong>♫ VocaFinder</strong><p>Unofficial fan-made music search. Powered by <a href="https://vocadb.net/" target="_blank" rel="noopener noreferrer">VocaDB</a>.</p></div><p>公開日はVocaDB上の初公開日、配信日は確認されたストア情報または手動登録です。登録画像は公式ジャケットとは限りません。動画・画像の権利は各権利者に帰属します。</p></div></footer>
+  <script type="module" src="js/app.js"></script>
+</body></html>
