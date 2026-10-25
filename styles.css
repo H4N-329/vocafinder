@@ -8,3 +8,55 @@
 .source-section{border:1px solid #344b60;border-radius:12px;padding:15px 16px;margin-top:14px;background:#122238}
 .source-section h4{font-size:14px;color:#a6eee4;margin:0 0 6px}
 .source-section .candidate-list{max-height:320px;overflow:auto;overscroll-behavior:contain}
+/* v4 compact DJ list: fit the beginning of a second result row on laptop screens */
+:root{line-height:1.38;font-size:13px}
+.site-header .topbar{min-height:43px;padding-top:6px;padding-bottom:6px}
+.brand{font-size:19px}.brand-icon{font-size:20px}.brand small{font-size:10px}
+.ghost-btn,.outlined{padding:7px 11px;border-radius:8px;font-size:12px}
+.hero{padding:14px 0 13px}.hero:after{display:none}
+.hero h1{font-size:clamp(23px,3vw,32px);line-height:1.17;letter-spacing:-.7px;margin:5px 0 4px}
+.lead{font-size:12px;margin:0 0 8px}.search-panel{max-width:880px;padding:6px;border-radius:10px}
+.search-tabs{padding:0 2px 5px}.search-tabs span{padding:4px 10px;font-size:11px}
+.search-line input{padding:8px 11px;font-size:14px}.primary{padding:7px 16px;font-size:12px}
+.examples{margin-top:6px;font-size:10px}.examples button{padding:3px 8px;margin:1px 2px;font-size:10px}
+.content{padding:14px 0 55px}.results-top{margin-bottom:9px}.results-top h2{font-size:20px;margin:3px 0}.results-top .subtle{font-size:11px}
+.filter-panel{gap:8px 12px;padding:10px 13px;border-radius:10px}.field label{font-size:10px}.field input,.field select{padding:6px 8px;border-radius:6px;font-size:12px}
+.bpm-field{width:94px}.sort-field{width:211px}.check-field{font-size:11px;gap:4px;padding:4px 0}.check-field input{width:14px;height:14px}
+.text-btn{padding:7px;font-size:11px}.scope-note{font-size:10px;margin:6px 0 11px}
+.song-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.song-card{border-radius:10px}.cover,.cover-fallback{height:100px}.cover-fallback{font-size:30px}
+.card-body{padding:9px}.card-body h3{font-size:13px;line-height:1.25;margin-bottom:3px;min-height:17px}
+.artist-line{font-size:10px;min-height:14px;line-height:1.3}.chips{margin:7px 0;gap:4px}.chip{font-size:10px;padding:3px 5px;border-radius:5px}
+.card-actions{gap:5px}.card-actions a,.card-actions button{font-size:10px;padding:5px 6px;border-radius:6px}
+.chip.type-chip{background:#4b314d;color:#f5d4fa}.chip.verified-chip{background:#245048;color:#d5fcf2}
+.artist-section{margin-bottom:14px}.section-head h2{font-size:16px}.section-head p{margin-bottom:6px;font-size:11px}
+.artist-grid{gap:5px}.artist-choice{font-size:11px;padding:5px 9px;border-radius:7px}.artist-notice{font-size:11px;margin:7px 0}
+.artist-section #addArtistSong{margin-top:7px}.alert{padding:16px}.outside-links{padding:8px 11px;margin-bottom:11px}
+@media(min-width:1000px){.song-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:700px){.hero{padding:13px 0}.hero h1{font-size:23px}.content{padding-top:11px}.results-top{gap:5px;align-items:start}.bpm-field{width:calc(50% - 6px)}.sort-field{width:100%;min-width:0}.song-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.cover,.cover-fallback{height:90px}.card-body{padding:7px}.card-actions a,.card-actions button{font-size:9px}}
+@media(max-width:450px){.song-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.search-line{flex-direction:row}.search-line button{padding:8px}.cover,.cover-fallback{height:78px}.card-actions button{margin-left:0}.card-body h3{font-size:12px}.chips{margin:5px 0}.chip{font-size:9px}.hero h1{font-size:20px}.lead{font-size:11px}}
+
+/* Tighten the completed-search layout so two card rows start on a 768px laptop. */
+body.has-results .hero{padding:6px 0 8px}
+body.has-results .hero .eyebrow,body.has-results .hero h1,body.has-results .hero .lead,body.has-results .examples{display:none}
+body.has-results .search-panel{padding:4px;border-radius:9px}
+body.has-results .search-tabs{padding-bottom:3px}
+body.has-results .artist-section{margin-bottom:8px}
+body.has-results .artist-section .section-head p,body.has-results .artist-notice{display:none}
+body.has-results .artist-section .section-head h2{font-size:12px;margin:0 0 4px;color:#92bccc}
+body.has-results .artist-section .artist-grid{gap:4px}
+body.has-results .artist-choice{padding:3px 8px;font-size:10px}
+body.has-results .artist-section #addArtistSong{margin-top:5px;padding:4px 9px}
+body.has-results .results-top{margin-bottom:7px}
+body.has-results .outside-links{padding:5px 9px;margin-bottom:7px}
+/* Artist-results dense layout: horizontal thumbnails keep two full rows visible. */
+body.has-results .song-card{display:grid;grid-template-columns:86px minmax(0,1fr);min-height:126px;align-items:stretch}
+body.has-results .cover,body.has-results .cover-fallback{height:100%;min-height:126px;width:86px;object-fit:cover}
+body.has-results .card-body{display:flex;flex-direction:column;min-width:0;padding:7px 7px 6px}
+body.has-results .card-body h3{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0}
+body.has-results .artist-line{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0}
+body.has-results .chips{gap:3px;max-height:43px;overflow:hidden;margin:4px 0}
+body.has-results .chip{font-size:9px;line-height:1.3;padding:2px 4px}
+body.has-results .card-actions{margin-top:auto;gap:4px}
+body.has-results .card-actions a,body.has-results .card-actions button{font-size:9px;padding:4px 5px}
+@media(max-width:450px){body.has-results .song-grid{grid-template-columns:1fr}body.has-results .song-card{grid-template-columns:96px minmax(0,1fr)}body.has-results .cover,body.has-results .cover-fallback{width:96px}}

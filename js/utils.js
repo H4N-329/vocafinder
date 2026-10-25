@@ -48,8 +48,8 @@ export const bpmLabel = bpm => bpm ? (bpm.min === bpm.max ? String(bpm.min) : `$
 export const artistString = song => song?.artistString || (song?.artists||[]).map(a=>a.name || a.artist?.name).filter(Boolean).join(' / ') || '未登録';
 export const pvsByService = (song, name) => (song?.pvs || []).filter(p => String(p.service||'').toLowerCase().includes(name.toLowerCase()) && safeUrl(p.url));
 export const getLinks = (song, edit={}) => {
-  const nico = edit.nicoUrl || pvsByService(song,'nico')[0]?.url || '';
-  const youtube = edit.youtubeUrl || pvsByService(song,'youtube')[0]?.url || '';
+  const nico = edit.nicoUrl || pvsByService(song,'nico').sort((a,b)=>Number(b.pvType==='Original')-Number(a.pvType==='Original'))[0]?.url || '';
+  const youtube = edit.youtubeUrl || song.verifiedYoutubeUrl || pvsByService(song,'youtube').sort((a,b)=>Number(b.pvType==='Original')-Number(a.pvType==='Original'))[0]?.url || '';
   return {nico: safeUrl(nico), youtube: safeUrl(youtube)};
 };
 export const videoDate = (song, edit={}) => {
@@ -76,11 +76,13 @@ export const sortSongs = (songs, mode, edits={}) => [...songs].sort((a,b)=>{
     if(y === undefined)return -1;
     return mode==='bpmAsc'?x-y:y-x;
   }
-  if(mode==='dateAsc'||mode==='dateDesc'){
-    const x=(a.publishDate||'').slice(0,10),y=(b.publishDate||'').slice(0,10);
+  if(mode==='dateAsc'||mode==='dateDesc'||mode==='uploadAsc'||mode==='uploadDesc'){
+    const videoSort=mode==='uploadAsc'||mode==='uploadDesc';
+    const x=(videoSort?(videoDate(a,edits[a.id])||a.publishDate):a.publishDate||'').slice(0,10);
+    const y=(videoSort?(videoDate(b,edits[b.id])||b.publishDate):b.publishDate||'').slice(0,10);
     if(!x)return y?1:0;
     if(!y)return -1;
-    return mode==='dateAsc'?x.localeCompare(y):y.localeCompare(x);
+    return ['dateAsc','uploadAsc'].includes(mode)?x.localeCompare(y):y.localeCompare(x);
   }
   if(mode==='name') return String(a.name||'').localeCompare(String(b.name||''),'ja');
   return 0;

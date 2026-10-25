@@ -14,7 +14,7 @@ const cachedFetch=async(url,signal)=>{
 export const findSongs=({query='',artistId=null,offset=0,limit=20,sort='None',signal})=>{
   const u=new URL(ROOT+'/songs');
   if(query)u.searchParams.set('query',query);
-  if(artistId)u.searchParams.set('artistId',String(artistId));
+  if(artistId){u.searchParams.set('artistId',String(artistId));u.searchParams.set('artistParticipationStatus','Everything');}
   u.searchParams.set('start',String(offset));
   u.searchParams.set('maxResults',String(limit));
   u.searchParams.set('getTotalCount','true');
