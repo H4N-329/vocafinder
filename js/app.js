@@ -1,6 +1,6 @@
 import {safeUrl,validSiteUrl,dateString,isoDate,numericBpm,effectiveBpm,bpmLabel,artistString,getLinks,videoDate,coverUrl,createCsv,matchesBpm,sortSongs,likelySameTitle} from './utils.js';
 import {loadEdits,saveEdits,cleanEdit,validateImport,backupJson} from './storage.js';
-import {findSongs,findArtists,fetchSong,findITunes,findNico,findYouTube} from './api.js';
+import {findSongs,findArtists,fetchSong,findITunes,findNico} from './api.js';
 
 const $=id=>document.getElementById(id);
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=String(text);return node;};
@@ -8,7 +8,7 @@ const appendLink=(parent,url,label)=>{const href=safeUrl(url);if(!href)return nu
 const row=(container,label,value)=>{container.append(el('dt','',label));const dd=el('dd');if(value instanceof Node)dd.append(value);else dd.textContent=String(value??'未登録');container.append(dd);return dd;};
 const API_PAGE=20;
 let edits=loadEdits();
-let youtubeKey=''; // never persisted or committed to GitHub
+let detailEpoch=0; // Ignore responses from previously opened songs.
 const state={term:'',mode:'song',artist:null,artists:[],songs:[],total:0,offset:0,busy:false,reqVersion:0,controller:null,detailVersion:0};
 const editFor=song=>edits[song.id]||{};
 const currentMode=()=>document.querySelector('input[name="searchMode"]:checked').value;
@@ -33,6 +33,15 @@ function displayCards(){const shown=filteredSongs(),container=$('results');conta
   $('loadMore').hidden=state.songs.length>=state.total||state.songs.length>=500||!state.term;
   if(state.songs.length>=500&&state.total>500)$('scopeNote').textContent='※ APIへの負荷を避けるため、最大500曲まで読み込めます。並び替えとCSVは取得済みの曲が対象です。';
 }
+function showExternalSearch(term){
+  const box=$('externalSearchLinks');box.replaceChildren();box.hidden=!term;
+  if(!term)return;
+  box.append(el('span','', 'ほかのサイトでも検索：'));
+  const query=encodeURIComponent(term);
+  appendLink(box,`https://www.nicovideo.jp/search/${query}`,'ニコニコ ↗');
+  appendLink(box,`https://music.apple.com/jp/search?term=${query}`,'Apple Music ↗');
+  appendLink(box,`https://www.youtube.com/results?search_query=${query}`,'YouTube ↗');
+}
 function resetSongs(){state.songs=[];state.offset=0;state.total=0;$('results').replaceChildren();$('loadMore').hidden=true;$('exportCsv').disabled=true;$('resultsSummary').textContent='検索中…';}
 async function loadSongs(reset=false){if(state.busy&&!reset)return;
   const {seq,signal}=startRequest();updateLoading(true);
@@ -52,7 +61,7 @@ async function loadSongs(reset=false){if(state.busy&&!reset)return;
 function drawArtists(){const cont=$('artistResults');cont.replaceChildren();for(const artist of state.artists){const btn=el('button',`artist-choice${state.artist?.id===artist.id?' selected':''}`,artist.name||'名前不明');btn.type='button';btn.addEventListener('click',()=>chooseArtist(artist));cont.append(btn);}if(!state.artists.length)cont.append(el('p','subtle','候補が見つかりませんでした。別の表記で検索してください。'));$('artistSection').hidden=false;}
 async function chooseArtist(artist){state.artist=artist;resetSongs();drawArtists();$('resultsHeading').textContent=`${artist.name} の楽曲`;$('resultsSummary').textContent='楽曲を読み込み中…';status('選択したアーティストの楽曲を取得しています…');await loadSongs(true);}
 async function search(){const term=$('query').value.trim();if(!term)return;
-  state.term=term;state.mode=currentMode();state.artist=null;state.artists=[];resetSongs();$('artistSection').hidden=true;$('resultsHeading').textContent=`「${term}」の検索`;
+  state.term=term;state.mode=currentMode();state.artist=null;state.artists=[];resetSongs();showExternalSearch(term);$('artistSection').hidden=true;$('resultsHeading').textContent=`「${term}」の検索`;
   const query=new URL(window.location.href);query.searchParams.set('q',term);query.searchParams.set('mode',state.mode);history.replaceState(null,'',query);
   if(state.mode==='song'){status('VocaDBで曲名検索しています…');await loadSongs(true);return;}
   const {seq,signal}=startRequest();updateLoading(true);status('VocaDBでアーティスト名検索しています…');
@@ -79,7 +88,7 @@ async function openDetail(id){const version=++state.detailVersion,dialog=$('deta
   if(!song){body.replaceChildren(el('p','subtle','楽曲の詳細が取得できませんでした。'));return;}
   renderDetail(song);
 }
-function renderDetail(song){const body=$('detailBody');body.replaceChildren();const ed=editFor(song);
+function renderDetail(song){const epoch=++detailEpoch;const body=$('detailBody');body.replaceChildren();const ed=editFor(song);
   const hd=el('div','detail-header'),titleArea=el('div');addImage(hd,song,true);titleArea.append(el('h2','',song.name||'曲名不明'),el('div','subtle',artistString(song)));appendLink(titleArea,`https://vocadb.net/S/${song.id}`,'VocaDBで確認 ↗');hd.append(titleArea);body.append(hd);
   const meta=el('dl','detail-meta');row(meta,'VocaDB初公開日',dateString(song.publishDate));row(meta,'登録動画投稿日',dateString(videoDate(song,ed)));row(meta,'BPM',bpmLabel(effectiveBpm(song,ed)));row(meta,'配信日',ed.streamingDate?`${dateString(ed.streamingDate)}（${ed.streamingSource||'手動登録'}）`:'未登録・未確認');row(meta,'登録動画',createVideoLinks(song,ed));if(ed.streamingUrl||ed.spotifyUrl){const box=el('div');appendLink(box,ed.streamingUrl||ed.spotifyUrl,'配信ページ ↗');row(meta,'配信リンク',box);}
   body.append(el('hr'),meta,el('p','info-box','初公開日はVocaDBが持つ「楽曲が初めて公になった日」です。Spotify等の配信開始日とは異なる場合があります。登録画像も正式なジャケットとは限りません。'));
@@ -97,35 +106,71 @@ function renderDetail(song){const body=$('detailBody');body.replaceChildren();co
     updateSaved(song.id,entered,feedback);
   });
   clear.addEventListener('click',()=>{delete edits[song.id];const ok=saveEdits(edits);if(ok){setFeedback(feedback,'この曲の手動登録を削除しました。');renderDetail(song);displayCards();}else setFeedback(feedback,'削除後の保存に失敗しました。',true);});
-  body.append(el('hr'),el('h3','','不足情報をほかのサイトで探す'));
-  body.append(el('p','subtle','検索候補は別の曲・カバー・Remixの可能性があります。タイトルと投稿者を確認してから「採用」を押してください。'));
-  const searchBtns=el('div','button-row'),candidate=el('div','candidate-list');
-  for(const [kind,label] of [['nico','ニコニコ候補'],['youtube','YouTube候補'],['apple','配信日候補 (iTunes)']]){const b=el('button','outlined',label);b.type='button';b.addEventListener('click',()=>loadCandidates(kind,song,candidate,()=>renderDetail(song)));searchBtns.append(b);}
-  body.append(searchBtns,candidate);
-  const searchLinks=el('div','button-row');for(const [service,text] of [['nico','ニコニコで直接検索 ↗'],['youtube','YouTubeで直接検索 ↗'],['apple','Apple Musicで検索 ↗'],['spotify','Spotifyで検索 ↗']])appendLink(searchLinks,externalSearchUrl(service,song),text);body.append(el('p','hint','APIに接続できない場合は下記の外部検索を使い、見つけたURLを上のフォームに貼り付けてください。'),searchLinks);
+  body.append(el('hr'),el('h3','','ニコニコ・iTunesから自動で情報を補完'));
+  body.append(el('p','subtle','詳細を開くと2つの無料APIで候補を検索します。別楽曲・カバー・Remixが混じるため、内容を確認して「採用」してください。採用前に情報が上書きされることはありません。'));
+  const nicoArea=el('section','source-section'),appleArea=el('section','source-section');
+  nicoArea.append(el('h4','','ニコニコ動画：投稿日・動画URL'));
+  appleArea.append(el('h4','','iTunes：配信日・配信ストアURL'));
+  const nicoResults=el('div','candidate-list'),appleResults=el('div','candidate-list');
+  nicoArea.append(nicoResults);appleArea.append(appleResults);
+  body.append(nicoArea,appleArea);
+  loadCandidates('nico',song,nicoResults,epoch);
+  loadCandidates('apple',song,appleResults,epoch);
+  const searchLinks=el('div','button-row');
+  for(const [service,text] of [['nico','ニコニコで直接検索 ↗'],['youtube','YouTubeで検索 ↗'],['apple','Apple Musicで検索 ↗'],['spotify','Spotifyで検索 ↗']])appendLink(searchLinks,externalSearchUrl(service,song),text);
+  body.append(el('p','hint','YouTubeはAPIキーなしの補助検索として利用します。VocaDBに登録済みのYouTube動画URLは上部に表示します。APIに接続できないときは直接検索で調べられます。'),searchLinks);
 }
-async function loadCandidates(kind,song,container,rerender){container.replaceChildren(el('p','subtle','候補を取得中…'));
-  let results;
-  try{const term=[song.name,artistString(song)==='未登録'?'':artistString(song)].filter(Boolean).join(' ');
-    if(kind==='nico')results=(await findNico(term)).map(v=>({title:v.title,url:`https://www.nicovideo.jp/watch/${encodeURIComponent(v.contentId)}`,date:(v.startTime||'').slice(0,10),source:'nico'}));
-    if(kind==='youtube'){
-      if(!youtubeKey){container.replaceChildren(el('p','hint','YouTube内の候補一覧にはAPIキーが必要です。「設定・バックアップ」で入力するか、下のYouTube外部検索を利用してください。'));return;}
-      results=(await findYouTube(term,youtubeKey)).map(v=>({title:v.snippet?.title,url:`https://www.youtube.com/watch?v=${v.id?.videoId||''}`,date:(v.snippet?.publishedAt||'').slice(0,10),channel:v.snippet?.channelTitle,source:'youtube'}));
+async function loadCandidates(kind,song,container,epoch){
+  container.replaceChildren(el('p','subtle','自動検索中…'));
+  let results=[];
+  try{
+    // Using just the title on Nico avoids overly strict searches.
+    if(kind==='nico'){
+      const data=await findNico(song.name);
+      results=data.filter(v=>/^(sm|nm|so)\d+$/.test(String(v.contentId||'')))
+        .map(v=>({title:v.title,url:`https://www.nicovideo.jp/watch/${v.contentId}`,date:(v.startTime||'').slice(0,10),source:'nico'}));
     }
-    if(kind==='apple')results=(await findITunes(term)).filter(v=>v.kind==='song').map(v=>({title:v.trackName,url:v.trackViewUrl,date:(v.releaseDate||'').slice(0,10),channel:v.artistName,source:'apple'}));
-    if(!$('detailDialog').open)return;
+    if(kind==='apple'){
+      // Title-only is more tolerant of differing artist and feat. credits.
+      const data=await findITunes(song.name);
+      results=data.filter(v=>v.kind==='song' && v.trackViewUrl)
+        .map(v=>({title:v.trackName,url:v.trackViewUrl,date:(v.releaseDate||'').slice(0,10),channel:v.artistName,source:'apple'}));
+    }
+    if(epoch!==detailEpoch||!$('detailDialog').open)return;
     container.replaceChildren();
-    if(!results?.length){container.append(el('p','subtle','候補が見つかりませんでした。外部検索か手動登録をご利用ください。'));return;}
-    for(const item of results){if(!safeUrl(item.url))continue;
-      const wrapper=el('div','candidate-item'),info=el('div'),title=el('strong','',item.title||'タイトル不明');const extra=el('small','',`${item.channel||''}　${dateString(item.date)}${likelySameTitle(song.name,item.title)?'　● 曲名が近い候補':''}`);info.append(title,extra);appendLink(info,item.url,'元のページ ↗');const button=el('button','','この候補を採用');button.type='button';button.addEventListener('click',()=>{
+    if(!results.length){container.append(el('p','subtle','候補が見つかりませんでした。下部の外部検索をご利用ください。'));return;}
+    const ranked=results.map(v=>({...v,similar:!!likelySameTitle(song.name,v.title)}))
+      .sort((a,b)=>Number(b.similar)-Number(a.similar)).slice(0,8);
+    for(const item of ranked){
+      if(!safeUrl(item.url))continue;
+      const wrapper=el('div','candidate-item'),info=el('div');
+      info.append(el('strong','',item.title||'タイトル不明'));
+      info.append(el('small','',`${item.channel||''}　${dateString(item.date)}${item.similar?'　● 曲名が近い候補':'　⚠ 曲名要確認'}`));
+      appendLink(info,item.url,kind==='apple'?'iTunesで曲を確認 ↗':'動画を確認 ↗');
+      const button=el('button','','確認して採用');button.type='button';
+      button.addEventListener('click',()=>{
+        if(epoch!==detailEpoch)return;
         const current={...editFor(song)};
-        if(item.source==='nico'&&validSiteUrl(item.url,'nico')){current.nicoUrl=item.url;if(isoDate(item.date))current.nicoPublished=item.date;}
-        if(item.source==='youtube'&&validSiteUrl(item.url,'youtube')){current.youtubeUrl=item.url;if(isoDate(item.date))current.youtubePublished=item.date;}
-        if(item.source==='apple'&&validSiteUrl(item.url,'apple')){current.streamingUrl=item.url;if(isoDate(item.date)){current.streamingDate=item.date;current.streamingSource='Apple Music / iTunes';}}
-        updateSaved(song.id,current);rerender();
-      });wrapper.append(info,button);container.append(wrapper);
+        if(item.source==='nico'&&validSiteUrl(item.url,'nico')){
+          current.nicoUrl=item.url;if(isoDate(item.date))current.nicoPublished=item.date;
+        }
+        if(item.source==='apple'&&validSiteUrl(item.url,'apple')){
+          current.streamingUrl=item.url;
+          if(isoDate(item.date)){
+            current.streamingDate=item.date;current.streamingSource='Apple Music / iTunes';
+          }
+        }
+        updateSaved(song.id,current);
+        renderDetail(song); // Show saved values and fresh candidate panels.
+      });
+      wrapper.append(info,button);container.append(wrapper);
     }
-  }catch(e){console.warn(kind+'候補API',e);container.replaceChildren(el('p','hint',`候補取得に失敗しました（接続制限・CORS・APIキー・API停止など）。外部検索と手動登録は利用できます。詳細: ${e.message}`));}
+  }catch(e){
+    if(epoch!==detailEpoch||!$('detailDialog').open)return;
+    console.warn(kind+'候補API',e);
+    const source=kind==='nico'?'ニコニコ':'iTunes';
+    container.replaceChildren(el('p','hint',`${source} APIの自動検索に失敗しました。接続制限・一時停止などの可能性があります。下部の外部検索は利用できます。(${e.message})`));
+  }
 }
 $('searchForm').addEventListener('submit',e=>{e.preventDefault();search();});
 for(const btn of document.querySelectorAll('[data-sample]'))btn.addEventListener('click',()=>{
@@ -138,7 +183,6 @@ for(const elem of [$('minBpm'),$('maxBpm'),$('onlyKnown'),$('sort')])elem.addEve
 $('resetFilters').addEventListener('click',()=>{$('minBpm').value='';$('maxBpm').value='';$('onlyKnown').checked=false;$('sort').value='original';displayCards();});
 $('openSettings').addEventListener('click',()=>{$('settingsDialog').showModal();});
 for(const btn of document.querySelectorAll('[data-close]'))btn.addEventListener('click',()=>$(btn.dataset.close).close());
-$('youtubeKey').addEventListener('input',e=>youtubeKey=e.target.value.trim());
 $('exportBackup').addEventListener('click',()=>download('vocafinder-backup-'+new Date().toISOString().slice(0,10)+'.json',backupJson(edits),'application/json;charset=utf-8'));
 $('importBackup').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;
   try{if(file.size>1024*1024)throw new Error('ファイルが大きすぎます（上限1 MB）。');

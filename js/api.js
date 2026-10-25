@@ -1,14 +1,15 @@
+/** External, read-only API clients. All calls run in the visitor's browser. */
 const ROOT='https://vocadb.net/api';
 const FIELDS='Artists,MainPicture,ThumbUrl,PVs,Bpm,WebLinks,Albums';
 const memo=new Map();
-const cachedFetch=async (url,signal)=>{
-  const key=url.toString(), cached=memo.get(key);
-  if(cached&&Date.now()-cached.time<5*60_000)return cached.data;
-  const r=await fetch(key,{signal,headers:{Accept:'application/json'}});
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  const data=await r.json();
-  if(memo.size>60)memo.delete(memo.keys().next().value);
-  memo.set(key,{time:Date.now(),data});return data;
+const CACHED_MS=5*60_000;
+const inCache=key=>{const hit=memo.get(key);return hit&&Date.now()-hit.time<CACHED_MS?hit.data:null;};
+const saveCache=(key,data)=>{if(memo.size>=60)memo.delete(memo.keys().next().value);memo.set(key,{time:Date.now(),data});return data;};
+const cachedFetch=async(url,signal)=>{
+  const key=url.toString(),hit=inCache(key);if(hit)return hit;
+  const response=await fetch(key,{signal,headers:{Accept:'application/json'}});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  return saveCache(key,await response.json());
 };
 export const findSongs=({query='',artistId=null,offset=0,limit=20,sort='None',signal})=>{
   const u=new URL(ROOT+'/songs');
@@ -32,25 +33,57 @@ export const findArtists=(term,signal)=>{
   return cachedFetch(u,signal);
 };
 export const fetchSong=(id,signal)=>{
-  const u=new URL(ROOT+'/songs/'+encodeURIComponent(id));u.searchParams.set('fields',FIELDS);u.searchParams.set('lang','Japanese');return cachedFetch(u,signal);
+  const u=new URL(ROOT+'/songs/'+encodeURIComponent(id));
+  u.searchParams.set('fields',FIELDS);u.searchParams.set('lang','Japanese');
+  return cachedFetch(u,signal);
 };
-export const findITunes=async(term,signal)=>{
+
+// Apple explicitly supports JSONP callback for website cross-origin searches.
+// The fixed endpoint is trusted; callback and script are removed after completion.
+let jsonpCounter=0;
+export const findITunes=(term)=>{
   const u=new URL('https://itunes.apple.com/search');
-  u.searchParams.set('term',term);u.searchParams.set('entity','song');u.searchParams.set('country','jp');u.searchParams.set('limit','12');
-  const r=await fetch(u,{signal});if(!r.ok)throw new Error('Apple API HTTP '+r.status);
-  const data=await r.json();return data.results||[];
+  u.searchParams.set('term',term);
+  u.searchParams.set('media','music');
+  u.searchParams.set('entity','song');
+  u.searchParams.set('country','jp');
+  u.searchParams.set('lang','ja_jp');
+  u.searchParams.set('limit','15');
+  const cacheKey=u.toString();const cached=inCache(cacheKey);
+  if(cached)return Promise.resolve(cached);
+  return new Promise((resolve,reject)=>{
+    const callback='__vocafinderApple'+(++jsonpCounter),script=document.createElement('script');
+    let finished=false;
+    const finish=(error,payload)=>{
+      if(finished)return;finished=true;clearTimeout(timer);
+      script.remove();delete window[callback];
+      if(error)reject(error);else resolve(saveCache(cacheKey,payload));
+    };
+    window[callback]=payload=>{
+      try{const data=typeof payload==='string'?JSON.parse(payload):payload;
+        if(!data||!Array.isArray(data.results))throw new Error('Appleの応答形式が不明です');
+        finish(null,data.results);
+      }catch(e){finish(e);}
+    };
+    u.searchParams.set('callback',callback);
+    script.src=u.toString();script.async=true;
+    script.onerror=()=>finish(new Error('iTunesに接続できませんでした'));
+    const timer=setTimeout(()=>finish(new Error('iTunesがタイムアウトしました')),10000);
+    document.head.append(script);
+  });
 };
+
+// Official snapshot search v2. It may not allow cross-origin browser access
+// at all times: caller must keep an external-search fallback available.
 export const findNico=async(term,signal)=>{
-  const u=new URL('https://api.search.nicovideo.jp/api/v2/snapshot/video/contents/search');
-  u.searchParams.set('q',term);u.searchParams.set('targets','title');u.searchParams.set('_fields','contentId,title,startTime');
-  u.searchParams.set('_sort','-startTime');u.searchParams.set('_limit','10');u.searchParams.set('_context','VocaFinderV2');
-  const r=await fetch(u,{signal});if(!r.ok)throw new Error('Nico HTTP '+r.status);
-  const data=await r.json();return data.data||[];
-};
-export const findYouTube=async(term,key,signal)=>{
-  const u=new URL('https://www.googleapis.com/youtube/v3/search');
-  u.searchParams.set('part','snippet');u.searchParams.set('q',term);u.searchParams.set('type','video');
-  u.searchParams.set('maxResults','10');u.searchParams.set('key',key);
-  const r=await fetch(u,{signal});if(!r.ok)throw new Error('YouTube API HTTP '+r.status);
-  const data=await r.json();return data.items||[];
+  const u=new URL('https://snapshot.search.nicovideo.jp/api/v2/snapshot/video/contents/search');
+  u.searchParams.set('q',term);
+  u.searchParams.set('targets','title');
+  u.searchParams.set('_fields','contentId,title,startTime,thumbnailUrl');
+  u.searchParams.set('_sort','-viewCounter');
+  u.searchParams.set('_limit','12');
+  u.searchParams.set('_context','VocaFinder');
+  const data=await cachedFetch(u,signal);
+  if(!Array.isArray(data.data))throw new Error('ニコニコAPIの応答形式が不明です');
+  return data.data;
 };
