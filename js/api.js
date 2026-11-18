@@ -14,7 +14,9 @@ const cachedFetch=async(url,signal)=>{
 export const findSongs=({query='',artistId=null,offset=0,limit=20,sort='None',signal})=>{
   const u=new URL(ROOT+'/songs');
   if(query)u.searchParams.set('query',query);
-  if(artistId){u.searchParams.set('artistId',String(artistId));u.searchParams.set('artistParticipationStatus','Everything');}
+  // VocaDB binds array filters through the [] query-name form.
+  // Plain artistId (and artistId[0]) is silently ignored, returning all songs.
+  if(artistId){u.searchParams.append('artistId[]',String(artistId));u.searchParams.set('artistParticipationStatus','Everything');}
   u.searchParams.set('start',String(offset));
   u.searchParams.set('maxResults',String(limit));
   u.searchParams.set('getTotalCount','true');
